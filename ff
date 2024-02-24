@@ -1,0 +1,2259 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "084c522a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "from scipy.stats import norm, t"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "a501d151",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.17718780696593192"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "def estimate_effect_size(std, n, alpha=0.05, power=0.8):\n",
+    "    \"\"\"\n",
+    "    Расчет MDE для контроля/пилота 50/50, одинаковые std и n\n",
+    "    \n",
+    "    :param std: стандартной отклонение одной группы\n",
+    "    :param n: размер выбрки в одной группе\n",
+    "    :return: MDE\n",
+    "    \"\"\"\n",
+    "    S = np.sqrt((std**2 / n) + (std**2 / n))\n",
+    "    M = norm.ppf(q=1-alpha/2) + norm.ppf(q=power)\n",
+    "    return M * S\n",
+    "\n",
+    "\n",
+    "n = 500\n",
+    "std = 1\n",
+    "estimate_effect_size(std, n)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "79987cca",
+   "metadata": {},
+   "source": [
+    "То есть `effect_size` < 0.17 будет обладать мощностью меньше 80%"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "4db9bce9",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "500.0"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "def estimate_sample_size(effect_size, std, alpha=0.05, power=0.8):\n",
+    "    \"\"\"\n",
+    "    Расчет N для контроля/пилота 50/50, одинаковые std и n\n",
+    "    :param std: ско одной группы\n",
+    "    :param effect_size: ожидаемое изменение метрики\n",
+    "    :return: N для одной группы\n",
+    "    \"\"\"\n",
+    "    M = (norm.ppf(q=1-alpha/2) + norm.ppf(q=power))**2\n",
+    "    return 2 * M * std**2 / effect_size**2 \n",
+    "\n",
+    "effect_size = 0.17718780696593192\n",
+    "std = 1\n",
+    "estimate_sample_size(effect_size, std)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "997c0e49",
+   "metadata": {},
+   "source": [
+    "Есть специальная функция !"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "6d1c8d99",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from statsmodels.stats.power import tt_ind_solve_power "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "f6b75a1a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "estimate_sample_size: 500.0\n",
+      "estimate_effect_size: 0.17718780696593192\n",
+      "tt_ind_solve_power nobs: 500.96095684136526\n",
+      "tt_ind_solve_power effect_size: 0.17735842307242328\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "n = 500\n",
+    "alpha = 0.05\n",
+    "power = 0.8\n",
+    "sd = 1\n",
+    "effect_size = 0.17718780696593192\n",
+    "\n",
+    "print(f\"\"\"\n",
+    "estimate_sample_size: {estimate_sample_size(effect_size, sd)}\n",
+    "estimate_effect_size: {estimate_effect_size(sd, n)}\n",
+    "tt_ind_solve_power nobs: {\n",
+    "    tt_ind_solve_power(\n",
+    "        effect_size=effect_size,\n",
+    "        alpha=alpha, \n",
+    "        power=power, \n",
+    "        ratio=1\n",
+    "    )\n",
+    "}\n",
+    "tt_ind_solve_power effect_size: {\n",
+    "    tt_ind_solve_power(\n",
+    "        nobs1=n, \n",
+    "        alpha=alpha, \n",
+    "        power=power, \n",
+    "        ratio=1\n",
+    "    )\n",
+    "}\n",
+    "\"\"\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a9b219fc",
+   "metadata": {},
+   "source": [
+    "_____________________________________________________________________________________________________________________"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5f807aee",
+   "metadata": {},
+   "source": [
+    "Критерий Стьюдента (t-test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "8a68c170",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "T-score:  -0.8203000819553226\n",
+      "T-critical:  1.9872898646909385\n",
+      "P_value:  1.5857384985085499\n",
+      "Confidence Interval of 2 sample Z-test:  [-0.68  0.28]\n"
+     ]
+    }
+   ],
+   "source": [
+    "N_a = 20\n",
+    "df_a = N_a - 1 # Кол-во степеней свободы для контрольной группы А\n",
+    "N_b = 70 # варьируем\n",
+    "df_b = N_b - 1 # Кол-во степеней свободы для экспериментальной группы B\n",
+    "\n",
+    "# Уровень значимости\n",
+    "alpha = 0.05\n",
+    "\n",
+    "# Генерируем t-распределение с параметрами контрольной группы А\n",
+    "X_a = np.random.standard_t(df_a,N_a)\n",
+    "# Генерируем t-распределение с параметрами экспериментальной группы B\n",
+    "X_b = np.random.standard_t(df_b,N_b)\n",
+    "\n",
+    "# Среднее значение метрики в контрольной группе А\n",
+    "mu_a = np.mean(X_a)\n",
+    "# Среднее значение метрики в экспериментальной группе B\n",
+    "mu_b = np.mean(X_b)\n",
+    "\n",
+    "# Выборочная дисперсия метрики в контрольной группе А\n",
+    "sigma_sqr_a = np.var(X_a)\n",
+    "# Выборочная дисперсия метрики в экспериментальной группе B\n",
+    "sigma_sqr_b = np.var(X_b)\n",
+    "\n",
+    "# Взвещенная выборочная дисперсия \n",
+    "pooled_variance_t_test = (\n",
+    "    (N_a-1)*sigma_sqr_a + (N_b -1) * sigma_sqr_b\n",
+    ")/(N_a + N_b-2)*(1/N_a + 1/N_b)\n",
+    "\n",
+    "# Взвещенное выборочное стандартное отклонение\n",
+    "SE = np.sqrt(pooled_variance_t_test)\n",
+    "\n",
+    "# Тестовая статистика\n",
+    "T = (mu_a-mu_b)/SE\n",
+    "\n",
+    "# Критическое значение теста для 2-сторонней гипотезы (распределение стьюдента)\n",
+    "t_crit = t.ppf(1-alpha/2, N_a + N_b - 2)\n",
+    "\n",
+    "# P-value для 2-сторонней гипотезы (симметрично)\n",
+    "p_value = t.sf(T, N_a + N_b - 2)*2\n",
+    "\n",
+    "# Отклонение\n",
+    "margin_error = t_crit * SE\n",
+    "# Доверительный интервал\n",
+    "CI = [(mu_a-mu_b) - margin_error, (mu_a-mu_b) + margin_error]\n",
+    "\n",
+    "print(\"T-score: \", T)\n",
+    "print(\"T-critical: \", t_crit)\n",
+    "print(\"P_value: \", p_value)\n",
+    "print(\"Confidence Interval of 2 sample Z-test: \", np.round(CI,2))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "19c4183b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from scipy.stats import ttest_ind, mannwhitneyu"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "98aed980",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Ttest_indResult(statistic=-0.810432903896122, pvalue=0.41987770165199756)"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "ttest_ind(\n",
+    "    X_a, \n",
+    "    X_b,\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1e15e18e",
+   "metadata": {},
+   "source": [
+    "Непараметрический тест Манна-Уитни"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "cd65491f",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "MannwhitneyuResult(statistic=604.0, pvalue=0.17700230647605086)"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "mannwhitneyu(\n",
+    "    X_a, \n",
+    "    X_b,\n",
+    "#     nan_policy='propagate',\n",
+    "#     alternative='two-sided'\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1c37e1c9",
+   "metadata": {},
+   "source": [
+    "`p-val` > 0.05  ==> H0 принимаем на этом уровне значимости => различий стат-значимых нет"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a763c34e",
+   "metadata": {},
+   "source": [
+    "________________________________________________________________________________________________________"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "26c6bbc8",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "reject the null\n",
+      "7.832495206930039e-11\n",
+      "Test Statistics stat:  6.503782823926798\n",
+      "Z-critical:  1.959963984540054\n",
+      "P_value:  7.832495206930039e-11\n",
+      "Confidence Interval of 2 sample Z-test for proportions:  [0.02 0.04]\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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GzUqKkoXL16sqqrXX3+9fvDBB8ft9zHv62BDhgTel9dfr5qWlvlyxQywQLPIqTaOPpyMHx+oK9+okTuaz9gvHxdXMK+dzXYrVKjAwoUL+fHHH/n+++/p3r07zz33HL169Tpu2cmTJzN69GhSUlLYsWMHK1euJCYmBoBrrrkGgMaNG/PZZ58BMHv27PT2lVdeyWmnnZa+rZEjRzJlyhQAtm7dyrp166hUqRJRUVFce+21APz666+0bdsWf+nr7t27s3bt2iz35aabbmLYsGFs3Lgx/bH58+cfs42bb76Z2bNnc/XVVx/zWgClS5emk+9y/YYNG3LSSSdRqlQpGjZsmN7fn5ycTP/+/UlISCAqKirbeLKiWVzoePHFF9OrVy9uuOGG9N9nZrp06ULZLK6c7tq1K2XLlqVs2bK0a9eOefPm5akrZs6cOXTr1o3yvlnNrrnmGn788Ue6dOlCrVq1iPO9pxo3bpy7cyFPPAHz5sFXX8HHH0PTplYTJweW6MPFd98FRh6cfrrrr8zsH9Vf07uQRUVF0bZtW9q2bUvDhg157733jkv0GzduZPjw4cyfP5/TTjuNXr16ubHSPv6un6ioKFKChtBJxg8zXFfCzJkz+fnnnylXrhxt27ZN31aZMmWIiorKdv2slCxZkvvvv5/nn38+/bGskmpmr1WqVKn01ytRokT6PpUoUSJ9n15++WXOOOMMlixZQlpaGmXyMCR28eLFXJDJJO+jRo3i119/5X//+x9xcXEkJCRkun75bKaUzPj7EhFKlixJWlpa+mPBf7esZPd7OymouzEqKiq0rpvACu6gp3Fj2LwZHnoIatSA7t1D30YxY3304WDJErj6atc/X6oUTJ4MNWt6HVW6NWvWsM4/yQnu5N8555wDQMWKFdnv60fdt28f5cuX55RTTuGPP/5gxowZOW67devWjB8/HoAZM2bw119/AbB3715OO+00ypUrx+rVq/nll18yXb958+bMmjWLpKQkkpOT+fjjj3N8zV69ejFz5kz8M501b96cH374gV27dpGamsqECRNo06ZNjtvJyt69e6latSolSpTggw8+yPVJ3E2bNvHAAw8wYMCA455bv349zZs356mnnqJy5cps3br1mL9BKL744guOHDlCUlISs2bNomnTppxzzjmsXLmSv//+m7179/Ltt9+mL5/V9lu3bs3nn3/O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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "X_a = 1242 # кол-во кликов в контрольной группе А\n",
+    "N_a = 9886 # кол-во показов в контрольной группе А\n",
+    "X_b = 974 # кол-во кликов в экспериментальной группе B\n",
+    "N_b = 10072  # кол-во показов в экспериментальной группе B\n",
+    "\n",
+    "# Уровень значимости\n",
+    "alpha = 0.05\n",
+    "\n",
+    "p_a_hat = X_a / N_a\n",
+    "p_b_hat = X_b / N_b\n",
+    "\n",
+    "p_pooled_hat = (X_a + X_b)/(N_a + N_b)\n",
+    "pooled_variance = p_pooled_hat*(1-p_pooled_hat) * (1/N_a + 1/N_b)\n",
+    "\n",
+    "# Выборочное стандартное отклонение\n",
+    "SE = np.sqrt(pooled_variance)\n",
+    "\n",
+    "# Тестовая статистика\n",
+    "Test_stat = (p_a_hat - p_b_hat)/SE\n",
+    "# Критическое значение теста для 2-сторонней гипотезы (из норм распределения)\n",
+    "Z_crit = norm.ppf(1-alpha/2)\n",
+    "\n",
+    "# Отклонение (ширина доверительного интервала)\n",
+    "# P-value для 2-сторонней гипотезы (симметрично)=> умножаем на два (для правой и левой крит-области)\n",
+    "p_value = norm.sf(Test_stat)*2\n",
+    "\n",
+    "# Доверительный интервал\n",
+    "CI = [(p_a_hat-p_b_hat) - SE * Z_crit, (p_a_hat-p_b_hat) + SE * Z_crit]\n",
+    "\n",
+    "if np.abs(Test_stat) >= Z_crit:\n",
+    "    print(\"reject the null\")\n",
+    "    print(p_value)\n",
+    "\n",
+    "print(\"Test Statistics stat: \", Test_stat)\n",
+    "print(\"Z-critical: \", Z_crit)\n",
+    "print(\"P_value: \", p_value)\n",
+    "print(\"Confidence Interval of 2 sample Z-test for proportions: \", np.round(CI,2))\n",
+    "\n",
+    "import matplotlib.pyplot as plt\n",
+    "z = np.arange(-3,3,  0.1)\n",
+    "plt.plot(z, norm.pdf(z), label = 'Standard Normal Distribution',color = 'red',linewidth = 2.5)\n",
+    "plt.fill_between(z[z>Z_crit], norm.pdf(z[z>Z_crit]), label = 'Right Rejection Region',color ='y' )\n",
+    "plt.fill_between(z[z<(-1)*Z_crit], norm.pdf(z[z<(-1)*Z_crit]), label = 'Left Rejection Region',color ='y' )\n",
+    "plt.title(\"Two Sample Z-test rejection region\")\n",
+    "plt.legend()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "ffa67f4e",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(0.12563220716164272, 0.09670373312152503)"
+      ]
+     },
+     "execution_count": 16,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "p_a_hat, p_b_hat "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "59a6c84a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from statsmodels.stats.proportion import proportions_ztest"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "3f5b4109",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "test_stat, p_value = proportions_ztest(np.array([X_a, X_b]), np.array([N_a, N_b]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "1d0b9df9",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "7.832495206930039e-11"
+      ]
+     },
+     "execution_count": 20,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "p_value"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d8802cce",
+   "metadata": {},
+   "source": [
+    "____________________________________________________________________________________________________________"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "cc272f9f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import matplotlib.pyplot as plt"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "66548bbc",
+   "metadata": {},
+   "source": [
+    "____________________________________________________________________________________________________________"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8471eff5",
+   "metadata": {},
+   "source": [
+    "# Sampling"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d9ad5fd9",
+   "metadata": {},
+   "source": [
+    "### Random Sampling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "id": "51019cfe",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(array([ 7.6845907 , 12.51819508,  8.65349578, ...,  8.73700008,\n",
+       "        12.02603009,  9.89662184]),\n",
+       " array([ 9.38587232,  9.05241074, 11.04545277, ...,  6.65061546,\n",
+       "        11.45790378, 10.5761622 ]),\n",
+       " 3000,\n",
+       " 3000)"
+      ]
+     },
+     "execution_count": 24,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "N = 10000\n",
+    "mu = 10\n",
+    "std = 2\n",
+    "population_df = np.random.normal(mu,std,N)\n",
+    "\n",
+    "def random_sampling(df, n):\n",
+    "    random_sample = np.random.choice(df, replace = True, size = n)\n",
+    "    return(random_sample)\n",
+    "n = 3000\n",
+    "random_sample_1 = random_sampling(population_df, n)\n",
+    "random_sample_2 = random_sampling(population_df, n)\n",
+    "random_sample_1, random_sample_2, len(random_sample_1), len(random_sample_2)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a9bcefd4",
+   "metadata": {},
+   "source": [
+    "### Systematic Sampling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "id": "69f93837",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(          id       data\n",
+       " 1        2.0   6.070384\n",
+       " 1001  1002.0   6.101274\n",
+       " 2001  2002.0   7.131032\n",
+       " 3001  3002.0  12.111854\n",
+       " 4001  4002.0  11.964387\n",
+       " 5001  5002.0   8.581882\n",
+       " 6001  6002.0   6.035390\n",
+       " 7001  7002.0   8.546485\n",
+       " 8001  8002.0   9.200488\n",
+       " 9001  9002.0  11.688597,\n",
+       "           id       data\n",
+       " 1        2.0   6.070384\n",
+       " 501    502.0  13.499480\n",
+       " 1001  1002.0   6.101274\n",
+       " 1501  1502.0   9.317947\n",
+       " 2001  2002.0   7.131032\n",
+       " 2501  2502.0   6.545273\n",
+       " 3001  3002.0  12.111854\n",
+       " 3501  3502.0   8.421779\n",
+       " 4001  4002.0  11.964387\n",
+       " 4501  4502.0  10.232885\n",
+       " 5001  5002.0   8.581882\n",
+       " 5501  5502.0   8.017922\n",
+       " 6001  6002.0   6.035390\n",
+       " 6501  6502.0  10.392968\n",
+       " 7001  7002.0   8.546485\n",
+       " 7501  7502.0  12.259444\n",
+       " 8001  8002.0   9.200488\n",
+       " 8501  8502.0  12.306609\n",
+       " 9001  9002.0  11.688597\n",
+       " 9501  9502.0   9.954870)"
+      ]
+     },
+     "execution_count": 25,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "N = 10000\n",
+    "mu = 10\n",
+    "std = 2\n",
+    "population_df = np.random.normal(mu, std, N)\n",
+    "\n",
+    "def systematic_sampling(df, step):\n",
+    "    id = pd.Series(np.arange(1,len(df),1))\n",
+    "    df = pd.Series(df)\n",
+    "    df_pd = pd.concat([id, df], axis = 1)\n",
+    "    df_pd.columns = [\"id\", \"data\"]\n",
+    "    \n",
+    "    selected_index = np.arange(1, len(df), step)\n",
+    "    \n",
+    "    systematic_sampling = df_pd.iloc[selected_index]\n",
+    "    return(systematic_sampling)\n",
+    "\n",
+    "n_1 = 10\n",
+    "n_2 = 20\n",
+    "step_1 = int(N/n_1)\n",
+    "step_2 = int(N/n_2)\n",
+    "sample_1 = systematic_sampling(population_df, step_1)\n",
+    "sample_2 = systematic_sampling(population_df, step_2)\n",
+    "sample_1, sample_2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13c97f92",
+   "metadata": {},
+   "source": [
+    "### Cluster Sampling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "237713df",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>price</th>\n",
+       "      <th>event_type</th>\n",
+       "      <th>click</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>0</td>\n",
+       "      <td>3.344918</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>1</td>\n",
+       "      <td>2.401037</td>\n",
+       "      <td>type2</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>2</td>\n",
+       "      <td>1.438926</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>3</td>\n",
+       "      <td>3.879434</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>4</td>\n",
+       "      <td>3.688545</td>\n",
+       "      <td>type2</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9995</th>\n",
+       "      <td>9995</td>\n",
+       "      <td>3.594442</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9996</th>\n",
+       "      <td>9996</td>\n",
+       "      <td>1.130378</td>\n",
+       "      <td>type2</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9997</th>\n",
+       "      <td>9997</td>\n",
+       "      <td>2.106538</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9998</th>\n",
+       "      <td>9998</td>\n",
+       "      <td>2.824972</td>\n",
+       "      <td>type2</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9999</th>\n",
+       "      <td>9999</td>\n",
+       "      <td>3.031426</td>\n",
+       "      <td>type1</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>10000 rows × 4 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "        id     price event_type  click\n",
+       "0        0  3.344918      type1      1\n",
+       "1        1  2.401037      type2      0\n",
+       "2        2  1.438926      type1      0\n",
+       "3        3  3.879434      type1      0\n",
+       "4        4  3.688545      type2      1\n",
+       "...    ...       ...        ...    ...\n",
+       "9995  9995  3.594442      type1      0\n",
+       "9996  9996  1.130378      type2      1\n",
+       "9997  9997  2.106538      type1      1\n",
+       "9998  9998  2.824972      type2      1\n",
+       "9999  9999  3.031426      type1      0\n",
+       "\n",
+       "[10000 rows x 4 columns]"
+      ]
+     },
+     "execution_count": 26,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "price_vb = pd.Series(np.random.uniform(1,4,size = N))\n",
+    "id = pd.Series(np.arange(0,len(price_vb),1))\n",
+    "event_type = pd.Series(np.random.choice([\"type1\",\"type2\",\"type3\"],size = len(price_vb)))\n",
+    "click = pd.Series(np.random.choice([0,1],size = len(price_vb)))\n",
+    "df = pd.concat([id,price_vb,event_type, click],axis = 1)\n",
+    "df.columns = [\"id\",\"price\",\"event_type\", \"click\"]\n",
+    "df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "d567fe44",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(        id     price event_type  click  cluster\n",
+       " 1990  1990  1.898071      type2      1       45\n",
+       " 1432  1432  3.494080      type3      1       45\n",
+       " 1433  1433  1.206759      type2      1       45\n",
+       " 2392  2392  3.138564      type2      1       45\n",
+       " 7326  7326  2.902839      type1      1       45\n",
+       " ...    ...       ...        ...    ...      ...\n",
+       " 913    913  3.147553      type3      1       53\n",
+       " 5526  5526  2.235462      type2      1       53\n",
+       " 7613  7613  2.151988      type3      1       53\n",
+       " 8881  8881  2.523236      type3      0       53\n",
+       " 2347  2347  3.971776      type3      1       53\n",
+       " \n",
+       " [200 rows x 5 columns],\n",
+       "         id     price event_type  click  cluster\n",
+       " 4370  4370  3.363576      type2      0        5\n",
+       " 1598  1598  2.275937      type2      0        5\n",
+       " 1991  1991  1.834692      type2      0        5\n",
+       " 3511  3511  3.231815      type1      0        5\n",
+       " 651    651  3.453516      type1      1        5\n",
+       " ...    ...       ...        ...    ...      ...\n",
+       " 7196  7196  1.950857      type2      1       85\n",
+       " 5991  5991  3.019361      type3      0       85\n",
+       " 8839  8839  3.640643      type1      0       85\n",
+       " 7587  7587  3.649884      type3      0       85\n",
+       " 9237  9237  1.173492      type1      1       85\n",
+       " \n",
+       " [200 rows x 5 columns])"
+      ]
+     },
+     "execution_count": 18,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "def get_clustered_Sample(df, n_per_cluster, num_select_clusters):\n",
+    "    N = len(df)\n",
+    "    K = int(N/n_per_cluster)\n",
+    "    data = None\n",
+    "    for k in range(K):\n",
+    "        sample_k = df.sample(n_per_cluster)\n",
+    "        sample_k[\"cluster\"] = np.repeat(k,len(sample_k))\n",
+    "        df = df.drop(index = sample_k.index)\n",
+    "        data = pd.concat([data,sample_k],axis = 0)\n",
+    "\n",
+    "    random_chosen_clusters = np.random.randint(0, K, size = num_select_clusters)\n",
+    "    samples = data[data.cluster.isin(random_chosen_clusters)]\n",
+    "    return(samples)\n",
+    "\n",
+    "sample_1 = get_clustered_Sample(df = df, n_per_cluster = 100, num_select_clusters = 2)\n",
+    "sample_2 = get_clustered_Sample(df = df, n_per_cluster = 100, num_select_clusters = 2)\n",
+    "sample_1, sample_2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5263e397",
+   "metadata": {},
+   "source": [
+    "### Weighted Sampling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "f4ed4163",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(                 id     price event_type  click\n",
+       " event_type                                     \n",
+       " type1      0   3149  3.757447      type1      1\n",
+       "            1   2720  1.731839      type1      0\n",
+       "            2   4264  2.928781      type1      0\n",
+       "            3   3947  1.762617      type1      1\n",
+       "            4   5111  2.225568      type1      1\n",
+       " ...             ...       ...        ...    ...\n",
+       " type3      29  3394  1.601427      type3      0\n",
+       "            30   489  1.100031      type3      0\n",
+       "            31  6826  2.791668      type3      1\n",
+       "            32  4856  3.212495      type3      0\n",
+       "            33  6748  3.876364      type3      1\n",
+       " \n",
+       " [100 rows x 4 columns],\n",
+       "                  id     price event_type  click\n",
+       " event_type                                     \n",
+       " type1      0   3707  3.513193      type1      1\n",
+       "            1   9465  2.132175      type1      0\n",
+       "            2   9739  1.757025      type1      0\n",
+       "            3   3347  1.691976      type1      1\n",
+       "            4   3381  3.753840      type1      1\n",
+       " ...             ...       ...        ...    ...\n",
+       " type3      29   599  2.375291      type3      0\n",
+       "            30  7508  1.005547      type3      1\n",
+       "            31  2211  3.495761      type3      1\n",
+       "            32  6204  1.753621      type3      1\n",
+       "            33  7999  2.481693      type3      1\n",
+       " \n",
+       " [100 rows x 4 columns])"
+      ]
+     },
+     "execution_count": 20,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "def get_weighted_sample(df,n):\n",
+    "    def get_class_prob(x):\n",
+    "        weight_x = int(np.rint(n * len(x[x.click != 0]) / len(df[df.click != 0])))\n",
+    "        sampled_x = x.sample(weight_x).reset_index(drop=True)\n",
+    "        return (sampled_x)\n",
+    "\n",
+    "    weighted_sample = df.groupby('event_type').apply(get_class_prob)\n",
+    "#     print(weighted_sample[\"event_type\"].value_counts())\n",
+    "    return (weighted_sample)\n",
+    "\n",
+    "sample_1 = get_weighted_sample(df, 100)\n",
+    "sample_2 = get_weighted_sample(df, 100)\n",
+    "sample_1, sample_2"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "84d0ebf6",
+   "metadata": {},
+   "source": [
+    "### Stratified Sampling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "d9f4d85b",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(      id     price event_type  click  cluster\n",
+       " 0   8358  3.834096      type1      0        0\n",
+       " 1   6653  2.262556      type1      1        0\n",
+       " 2   7599  2.629637      type1      1        0\n",
+       " 3   5346  1.869143      type1      0        0\n",
+       " 4    139  1.590837      type1      1        0\n",
+       " ..   ...       ...        ...    ...      ...\n",
+       " 95  8203  3.515044      type3      0       49\n",
+       " 96  3151  1.520177      type3      0       49\n",
+       " 97  4229  1.209915      type3      1       49\n",
+       " 98  6395  2.948647      type3      0       49\n",
+       " 99  4185  1.229477      type3      1       49\n",
+       " \n",
+       " [200 rows x 5 columns],\n",
+       "       id     price event_type  click  cluster\n",
+       " 0    354  3.756202      type1      1       15\n",
+       " 1   9623  3.972615      type1      1       15\n",
+       " 2   3127  1.888110      type1      1       15\n",
+       " 3   6846  3.688136      type1      0       15\n",
+       " 4   4942  3.438215      type1      1       15\n",
+       " ..   ...       ...        ...    ...      ...\n",
+       " 95  6232  2.832343      type3      1       28\n",
+       " 96  8371  2.084039      type3      0       28\n",
+       " 97  5758  2.858808      type3      0       28\n",
+       " 98  7197  2.807413      type3      0       28\n",
+       " 99   728  2.339543      type3      1       28\n",
+       " \n",
+       " [200 rows x 5 columns])"
+      ]
+     },
+     "execution_count": 22,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "def get_startified_sample(df,n,num_clusters_needed):\n",
+    "    N = len(df)\n",
+    "    num_obs_per_cluster = int(N/n)\n",
+    "    K = int(N/num_obs_per_cluster)\n",
+    "\n",
+    "    def get_weighted_sample(df,num_obs_per_cluster):\n",
+    "        def get_sample_per_class(x):\n",
+    "            n_x = int(np.rint(num_obs_per_cluster*len(x[x.click !=0])/len(df[df.click !=0])))\n",
+    "            sample_x = x.sample(n_x)\n",
+    "            return(sample_x)\n",
+    "        weighted_sample = df.groupby(\"event_type\").apply(get_sample_per_class)\n",
+    "        return(weighted_sample)\n",
+    "\n",
+    "    stratas = None\n",
+    "    for k in range(K):\n",
+    "        weighted_sample_k = get_weighted_sample(df, num_obs_per_cluster).reset_index(drop = True)\n",
+    "        weighted_sample_k[\"cluster\"] = np.repeat(k,len(weighted_sample_k))\n",
+    "        stratas = pd.concat([stratas, weighted_sample_k],axis = 0)\n",
+    "        df.drop(index = weighted_sample_k.index)\n",
+    "    selected_strata_clusters = np.random.randint(0, K, size = num_clusters_needed)\n",
+    "    stratified_samples = stratas[stratas.cluster.isin(selected_strata_clusters)]\n",
+    "    return(stratified_samples)\n",
+    "\n",
+    "sample_1 = get_startified_sample(df = df, n = 100, num_clusters_needed = 2)\n",
+    "sample_2 = get_startified_sample(df = df, n = 100, num_clusters_needed = 2)\n",
+    "sample_1, sample_2\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "861250b8",
+   "metadata": {},
+   "source": [
+    "# Bootstrap "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "557544b0",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "      0           1\n",
+      "0   211  Experiment\n",
+      "1   217  Experiment\n",
+      "2   205  Experiment\n",
+      "3   197  Experiment\n",
+      "4   213  Experiment\n",
+      "..  ...         ...\n",
+      "95  223     Control\n",
+      "96  218     Control\n",
+      "97  210     Control\n",
+      "98  211     Control\n",
+      "99  214     Control\n",
+      "\n",
+      "[100 rows x 2 columns]\n",
+      "Mean of X_bar_exp - X_bar_con -1.009815462440855\n",
+      "Standard Error of X_bar_exp - X_bar_con 0.23205897828131483\n",
+      "CI of X_bar_exp - X_bar_con [-1.4646427021613948, -0.5549882227203153]\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "N = 100\n",
+    "X = pd.Series(np.random.binomial(300, 0.7, size = N))\n",
+    "Y_a, Y_b = np.repeat(\"Experiment\",N/2), np.repeat(\"Control\", N/2)\n",
+    "N_a, N_b = len(Y_a), len(Y_b)\n",
+    "\n",
+    "Y = pd.Series(np.append(Y_a, Y_b))\n",
+    "data = pd.concat([X,Y],axis = 1)\n",
+    "print(data)\n",
+    "means_per_group = data.groupby(1, group_keys = False)[0].mean()\n",
+    "medians_per_group = data.groupby(1)[0].median()\n",
+    "\n",
+    "alpha = 0.05\n",
+    "def bootstrap(data, b_iter):\n",
+    "    boot_mean_diff = []\n",
+    "    boot_medians_diff = []\n",
+    "\n",
+    "    boot_means_a = []\n",
+    "    boot_means_b = []\n",
+    "\n",
+    "    count_num_positives_meandiff = 0\n",
+    "    count_num_positives_mediandiff = 0\n",
+    "\n",
+    "    for i in range(b_iter):\n",
+    "\n",
+    "        boot_sample = data.sample(frac = 1, replace = True)\n",
+    "\n",
+    "        # Выборочное среднее на этой итерации bootstrap для A и B группы\n",
+    "        boot_means_per_group = boot_sample.groupby(1)[0].mean()\n",
+    "        boot_sample_mean_a = boot_means_per_group[\"Control\"]\n",
+    "        boot_sample_mean_b = boot_means_per_group[\"Experiment\"]\n",
+    "\n",
+    "        boot_means_a.append(boot_sample_mean_a)\n",
+    "        boot_means_b.append(boot_sample_mean_b)\n",
+    "\n",
+    "        # Разность выборочных средних между группами А и B на этой итерации bootstrap\n",
+    "        diff_means = boot_sample_mean_b - boot_sample_mean_a\n",
+    "\n",
+    "        # Считаем кол-во итераций, когда разность средих была положительна\n",
+    "        if diff_means > 0:\n",
+    "            count_num_positives_meandiff += 1\n",
+    "\n",
+    "        # Считаем медианы по группам контроля / воздействия\n",
+    "        boot_medians_per_group = boot_sample.groupby(1)[0].median()\n",
+    "\n",
+    "        # Считаем кол-во итераций, когда разность медиан была положительна\n",
+    "        diff_medians = boot_medians_per_group[\"Experiment\"] - boot_medians_per_group[\"Control\"]\n",
+    "        if diff_medians > 0:\n",
+    "            count_num_positives_mediandiff += 1\n",
+    "\n",
+    "        boot_mean_diff.append(diff_means)\n",
+    "        boot_medians_diff.append(diff_medians)\n",
+    "\n",
+    "    return(\n",
+    "        boot_means_a,\n",
+    "        boot_means_b,\n",
+    "        count_num_positives_meandiff,\n",
+    "        count_num_positives_mediandiff,\n",
+    "        boot_mean_diff\n",
+    "    )\n",
+    "\n",
+    "b_iter = 5000\n",
+    "X_bars_a, X_bars_b , n_means, n_medians, boot_mean_diff = bootstrap(data, b_iter)\n",
+    "Z_mean = np.mean(X_bars_b)- np.mean(X_bars_a)\n",
+    "Z_sigma = np.sqrt((np.var(X_bars_b)/N_b + np.var(X_bars_a)/N_a))\n",
+    "CI = [Z_mean - norm.ppf(1-alpha/2)*Z_sigma, Z_mean + norm.ppf(1-alpha/2)*Z_sigma]\n",
+    "\n",
+    "print(\"Mean of X_bar_exp - X_bar_con\", Z_mean)\n",
+    "print(\"Standard Error of X_bar_exp - X_bar_con\", Z_sigma)\n",
+    "print(\"CI of X_bar_exp - X_bar_con\", CI)\n",
+    "\n",
+    "p_value_diff_means = n_means/b_iter\n",
+    "p_value_diff_medians = n_medians/b_iter\n",
+    "\n",
+    "CI = np.percentile(boot_mean_diff, [2.5, 97.5])\n",
+    "\n",
+    "counts, bins, ignored = plt.hist(\n",
+    "    boot_mean_diff, 50,\n",
+    "    density = True,\n",
+    "    color = 'red'\n",
+    ")\n",
+    "plt.xlabel(\"Величина разности средних\")\n",
+    "plt.title(\"Распределение разности средних между группами\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "id": "e9d025f9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import random\n",
+    "import datetime\n",
+    "import os\n",
+    "import scipy.stats as st"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "id": "71b88ece",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def generate_data():\n",
+    "    ''' Функция, генерирующая трафик магазинов по дням с 2019-01-01 по 2019-06-39'''\n",
+    "\n",
+    "    ID = random.sample(range(1000001, 100000001), 1000)  # Генерируем уникальные id (восьмизначные числа) для 1'000 магазинов\n",
+    "\n",
+    "    mean_daily = 600    # Исходя из того, что в магазины из крупных сетей (около 10'000 магазинов) ежедневный поток\n",
+    "                        # покупателей (далее трафик - traffic) в среднем составляет 1300 человек, предположим, что\n",
+    "                        # для сети в 1'000 магазинов траффик меньше примерно в два раза (из-за убывающей отдачи от масштаба), \n",
+    "                        # то есть в среднем составляет 600 человек/день\n",
+    "\n",
+    "    # Теперь предположим, что ввиду того, что сеть магазинов большая, у каждого магазина есть постоянный и достаточно \n",
+    "    # стабильный трафик (то есть небольшое стандартное отклонение). Магазины могут быть разными по величине, поэтому \n",
+    "    # возьмем нормальное распределение по объемам трафика со средним mean_daily и std = 10% от mean_daily\n",
+    "    mean_for_each_id = np.random.normal(loc = mean_daily, scale = 0.1 * mean_daily, size = 1000)\n",
+    "\n",
+    "    # Составим датафрейм со средними значениями трафика для каждого магазина.\n",
+    "    traffic_conf_int = pd.DataFrame({'mean_traffic': np.array(list(map(int, mean_for_each_id))),\n",
+    "                                    'lower_bound': np.zeros(len(mean_for_each_id)),\n",
+    "                                    'upper_bound': np.zeros(len(mean_for_each_id)),}, index = ID)\n",
+    "\n",
+    "    # Сгенерируем нижнюю и верхнюю границы доверительных интервалов, в которых будет колебаться трафик в каждом магазине\n",
+    "    traffic_conf_int['lower_bound'] = traffic_conf_int['mean_traffic'].map(lambda i: st.norm.interval(0.95,\n",
+    "                                                                                                    loc = i,\n",
+    "                                                                                                    scale = 0.1 * i)[0]).map(int)\n",
+    "    traffic_conf_int['upper_bound'] = traffic_conf_int['mean_traffic'].map(lambda i: st.norm.interval(0.95,\n",
+    "                                                                                                    loc = i,\n",
+    "                                                                                                    scale = 0.1 * i)[1]).map(int)\n",
+    "\n",
+    "    # Генерируем данные в промежутке от 2019-01-01 до 2019-06-30.\n",
+    "    date_start = datetime.datetime(2019, 1, 1)\n",
+    "    date_end = datetime.datetime(2019, 6, 30)\n",
+    "    date_index = pd.date_range(date_start, date_end)\n",
+    "\n",
+    "    # Создаем для датафрейм дневного трафика в каждом магазине за рассматриваемый промежуток времени.\n",
+    "    right_indexes = pd.MultiIndex.from_product([ID, date_index.to_list()], names=['id', 'date'])\n",
+    "\n",
+    "    daily_df = pd.DataFrame({'traffic': np.zeros(len(right_indexes))}, index = right_indexes).reset_index()\n",
+    "\n",
+    "    # Соединяем два полученных датафрейма, чтобы сгенерировать случайный дневной трафик для каждого магазина в\n",
+    "    # пределах его доверительного интервала.\n",
+    "    merged_df = pd.merge(daily_df, traffic_conf_int, left_on = 'id', right_index = True, how = 'left', sort=False)\n",
+    "\n",
+    "    def foo(x):\n",
+    "        ''' Функция выдает случайное число типа int в границах заданного доверительного интервала'''\n",
+    "    \n",
+    "        traffic = random.randint(merged_df['lower_bound'][x], merged_df['upper_bound'][x])\n",
+    "        return traffic\n",
+    "\n",
+    "    # Для каждого магазина генерируем дневной трафик.\n",
+    "    merged_df['traffic'] = merged_df['traffic'].map(foo)\n",
+    "\n",
+    "    # Из полученного датафрейма merged_df убираем лишние колонки и получаем готовый сгенерированный датафрейм.\n",
+    "    generated_df = merged_df.drop(['mean_traffic', 'lower_bound', 'upper_bound'], axis = 1)\n",
+    "\n",
+    "    return generated_df \n",
+    "\n",
+    "\n",
+    "generated_df = generate_data()\n",
+    "# linearized_df = linearize_data(generated_df = generated_df)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "id": "d41b4895",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "generated_df['period'] = ''\n",
+    "generated_df.loc[generated_df['date'] >= '2019-04-01','period'] = 'after'\n",
+    "generated_df.loc[generated_df['date'] < '2019-04-01','period'] = 'before'\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "id": "ec160b50",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "dict_ = {\n",
+    "    0: [],\n",
+    "    1: []\n",
+    "}\n",
+    "for i in list(generated_df.id.unique()):\n",
+    "    grp = int(np.random.randint(0, 2, 1))\n",
+    "    dict_[grp].append(i)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "id": "370b8466",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "generated_df.loc[generated_df['id'].isin(dict_[0]), 'group'] = 'A'\n",
+    "generated_df.loc[generated_df['id'].isin(dict_[1]), 'group'] = 'B'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "id": "8522a725",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_t = (\n",
+    "    generated_df\n",
+    "    .groupby(['date', 'group', 'period'])\n",
+    "    .agg(\n",
+    "        {'traffic': sum}\n",
+    "    )\n",
+    "    .reset_index()\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "id": "2cc9a6be",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>date</th>\n",
+       "      <th>group</th>\n",
+       "      <th>period</th>\n",
+       "      <th>traffic</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>2019-01-01</td>\n",
+       "      <td>A</td>\n",
+       "      <td>before</td>\n",
+       "      <td>313724</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>2019-01-01</td>\n",
+       "      <td>B</td>\n",
+       "      <td>before</td>\n",
+       "      <td>281426</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>2019-01-02</td>\n",
+       "      <td>A</td>\n",
+       "      <td>before</td>\n",
+       "      <td>315437</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>2019-01-02</td>\n",
+       "      <td>B</td>\n",
+       "      <td>before</td>\n",
+       "      <td>281474</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>2019-01-03</td>\n",
+       "      <td>A</td>\n",
+       "      <td>before</td>\n",
+       "      <td>315178</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>357</th>\n",
+       "      <td>2019-06-28</td>\n",
+       "      <td>B</td>\n",
+       "      <td>after</td>\n",
+       "      <td>282630</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>358</th>\n",
+       "      <td>2019-06-29</td>\n",
+       "      <td>A</td>\n",
+       "      <td>after</td>\n",
+       "      <td>310534</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>359</th>\n",
+       "      <td>2019-06-29</td>\n",
+       "      <td>B</td>\n",
+       "      <td>after</td>\n",
+       "      <td>282663</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>360</th>\n",
+       "      <td>2019-06-30</td>\n",
+       "      <td>A</td>\n",
+       "      <td>after</td>\n",
+       "      <td>316572</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>361</th>\n",
+       "      <td>2019-06-30</td>\n",
+       "      <td>B</td>\n",
+       "      <td>after</td>\n",
+       "      <td>286249</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>362 rows × 4 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "          date group  period  traffic\n",
+       "0   2019-01-01     A  before   313724\n",
+       "1   2019-01-01     B  before   281426\n",
+       "2   2019-01-02     A  before   315437\n",
+       "3   2019-01-02     B  before   281474\n",
+       "4   2019-01-03     A  before   315178\n",
+       "..         ...   ...     ...      ...\n",
+       "357 2019-06-28     B   after   282630\n",
+       "358 2019-06-29     A   after   310534\n",
+       "359 2019-06-29     B   after   282663\n",
+       "360 2019-06-30     A   after   316572\n",
+       "361 2019-06-30     B   after   286249\n",
+       "\n",
+       "[362 rows x 4 columns]"
+      ]
+     },
+     "execution_count": 35,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_t"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "10c6d9d8",
+   "metadata": {},
+   "source": [
+    "## Ranking"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "id": "64870e39",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_r = df_t.drop(['period', 'date'], axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "id": "16ff59ec",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(1580.1929719520037, 1515.9085315000937)"
+      ]
+     },
+     "execution_count": 37,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_r[df_r.group == 'A'].traffic.std(), df_r[df_r.group == 'B'].traffic.std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "id": "f3e4d569",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_r.loc[df_r.group == 'A','rank'] = df_r[df_r.group == 'A'].traffic.rank()\n",
+    "df_r.loc[df_r.group == 'B','rank'] = df_r[df_r.group == 'B'].traffic.rank()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "id": "a960b996",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(52.394232082888244, 52.39425859131259)"
+      ]
+     },
+     "execution_count": 40,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_r[df_r.group == 'A']['rank'].std(), df_r[df_r.group == 'B']['rank'].std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "id": "d28c3d91",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Ttest_indResult(statistic=184.50651285172054, pvalue=0.0) \n",
+      " Ttest_indResult(statistic=0.0, pvalue=1.0)\n"
+     ]
+    }
+   ],
+   "source": [
+    "ttest = ttest_ind(\n",
+    "    df_r[df_r.group == 'A'].traffic, \n",
+    "    df_r[df_r.group == 'B'].traffic,\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "ttest_r = ttest_ind(\n",
+    "    df_r[df_r.group == 'A']['rank'], \n",
+    "    df_r[df_r.group == 'B']['rank'],\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "# mwtest = mannwhitneyu(\n",
+    "#     df_r[df_r.group == 'A'].traffic, \n",
+    "#     df_r[df_r.group == 'B'].traffic\n",
+    "# #     nan_policy='propagate',\n",
+    "# #     alternative='two-sided'\n",
+    "# )\n",
+    "print(ttest,'\\n', ttest_r)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "44b0f3d3",
+   "metadata": {},
+   "source": [
+    "## Logarithm"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 42,
+   "id": "c161d91f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import math"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 43,
+   "id": "19923ff8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_l = df_t.drop(['period', 'date'], axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 44,
+   "id": "0dbe5e24",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(1580.1929719520037, 1515.9085315000937)"
+      ]
+     },
+     "execution_count": 44,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_l[df_l.group == 'A'].traffic.std(), df_l[df_l.group == 'B'].traffic.std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 45,
+   "id": "c2ae3a69",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_l.loc[df_l.group == 'A','log'] = df_l[df_l.group == 'A'].traffic.map(lambda x: math.log(x))\n",
+    "df_l.loc[df_l.group == 'B','log'] = df_l[df_l.group == 'B'].traffic.map(lambda x: math.log(x))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "id": "b2622161",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(0.005043196931512086, 0.005342855445805235)"
+      ]
+     },
+     "execution_count": 46,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_l[df_l.group == 'A']['log'].std(), df_l[df_l.group == 'B']['log'].std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 47,
+   "id": "41c60d66",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Ttest_indResult(statistic=184.50651285172054, pvalue=0.0) \n",
+      " Ttest_indResult(statistic=184.29164398232777, pvalue=0.0)\n"
+     ]
+    }
+   ],
+   "source": [
+    "ttest = ttest_ind(\n",
+    "    df_l[df_l.group == 'A'].traffic, \n",
+    "    df_l[df_l.group == 'B'].traffic,\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "\n",
+    "ttest_l = ttest_ind(\n",
+    "    df_l[df_l.group == 'A']['log'], \n",
+    "    df_l[df_l.group == 'B']['log'],\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "# mwtest = mannwhitneyu(\n",
+    "#     df_r[df_r.group == 'A'].traffic, \n",
+    "#     df_r[df_r.group == 'B'].traffic\n",
+    "# #     nan_policy='propagate',\n",
+    "# #     alternative='two-sided'\n",
+    "# )\n",
+    "print(ttest,'\\n',ttest_l)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "df615252",
+   "metadata": {},
+   "source": [
+    "## Normalisation"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 48,
+   "id": "c018c8ec",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_norm = df_t.drop(['period', 'date'], axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 104,
+   "id": "54828ad0",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(1459.7988793039913, 1484.1835501369897)"
+      ]
+     },
+     "execution_count": 104,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_norm[df_norm.group == 'A'].traffic.std(), df_norm[df_norm.group == 'B'].traffic.std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 49,
+   "id": "4b57bdaf",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "grp_a_max = df_norm[df_norm.group == 'A'].traffic.max()\n",
+    "grp_a_min = df_norm[df_norm.group == 'A'].traffic.min()\n",
+    "grp_b_max = df_norm[df_norm.group == 'B'].traffic.max()\n",
+    "grp_b_min = df_norm[df_norm.group == 'B'].traffic.min()\n",
+    "df_norm.loc[\n",
+    "    df_norm.group == 'A','norm'\n",
+    "] = df_norm[df_norm.group == 'A'].traffic.map(lambda x: (x-grp_a_min)/(grp_a_max - grp_a_min))\n",
+    "df_norm.loc[\n",
+    "    df_norm.group == 'B','norm'\n",
+    "] = df_norm[df_norm.group == 'B'].traffic.map(lambda x: (x-grp_b_min)/(grp_b_max - grp_b_min))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "id": "ef6e3425",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(0.1772311543239125, 0.18237590609962626)"
+      ]
+     },
+     "execution_count": 50,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_norm[df_norm.group == 'A']['norm'].std(), df_norm[df_norm.group == 'B']['norm'].std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "id": "20ed2df3",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Ttest_indResult(statistic=184.50651285172054, pvalue=0.0) \n",
+      " Ttest_indResult(statistic=6.262620131684391, pvalue=1.079203162026589e-09)\n"
+     ]
+    }
+   ],
+   "source": [
+    "ttest = ttest_ind(\n",
+    "    df_norm[df_norm.group == 'A'].traffic, \n",
+    "    df_norm[df_norm.group == 'B'].traffic,\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "ttest_norm = ttest_ind(\n",
+    "    df_norm[df_norm.group == 'A']['norm'], \n",
+    "    df_norm[df_norm.group == 'B']['norm'],\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "mwtest = mannwhitneyu(\n",
+    "    df_r[df_r.group == 'A'].traffic, \n",
+    "    df_r[df_r.group == 'B'].traffic\n",
+    "#     nan_policy='propagate',\n",
+    "#     alternative='two-sided'\n",
+    ")\n",
+    "print(ttest,'\\n',ttest_norm)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b7e1adce",
+   "metadata": {},
+   "source": [
+    "## Standartization"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 53,
+   "id": "ac779df0",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_st = df_t.drop(['period', 'date'], axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "id": "e3748679",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(1580.1929719520037, 1515.9085315000937)"
+      ]
+     },
+     "execution_count": 54,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_st[df_st.group == 'A'].traffic.std(), df_st[df_st.group == 'B'].traffic.std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 58,
+   "id": "6c233e06",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "grp_a_std = df_st[df_st.group == 'A'].traffic.std()\n",
+    "grp_a_mean = df_st[df_st.group == 'A'].traffic.mean()\n",
+    "grp_b_std = df_st[df_st.group == 'B'].traffic.std()\n",
+    "grp_b_mean = df_st[df_st.group == 'B'].traffic.mean()\n",
+    "df_st.loc[\n",
+    "    df_st.group == 'A','st'\n",
+    "] = df_st[df_st.group == 'A'].traffic.map(lambda x: (x-grp_a_mean)/ grp_a_std)\n",
+    "df_st.loc[\n",
+    "    df_st.group == 'B','st'\n",
+    "] = df_st[df_st.group == 'B'].traffic.map(lambda x: (x-grp_b_std)/grp_b_std)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 59,
+   "id": "2fcf29b6",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(1.0000000000000002, 1.0)"
+      ]
+     },
+     "execution_count": 59,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_st[df_st.group == 'A']['st'].std(), df_st[df_st.group == 'B']['st'].std()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "id": "f4e5b9e9",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Ttest_indResult(statistic=184.50651285172054, pvalue=0.0) \n",
+      " Ttest_indResult(statistic=-1770.4230634133644, pvalue=0.0)\n",
+      "MannwhitneyuResult(statistic=0.0, pvalue=3.9221177648070366e-61) \n",
+      " MannwhitneyuResult(statistic=0.0, pvalue=3.9221177648070366e-61)\n"
+     ]
+    }
+   ],
+   "source": [
+    "ttest = ttest_ind(\n",
+    "    df_st[df_st.group == 'A'].traffic, \n",
+    "    df_st[df_st.group == 'B'].traffic,\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "ttest_st = ttest_ind(\n",
+    "    df_st[df_st.group == 'A']['st'], \n",
+    "    df_st[df_st.group == 'B']['st'],\n",
+    "    equal_var=True,\n",
+    "    nan_policy='propagate',\n",
+    "    alternative='two-sided'\n",
+    ")\n",
+    "mwtest = mannwhitneyu(\n",
+    "    df_st[df_st.group == 'A'].traffic, \n",
+    "    df_st[df_st.group == 'B'].traffic\n",
+    "#     nan_policy='propagate',\n",
+    "#     alternative='two-sided'\n",
+    ")\n",
+    "mwtest_st = mannwhitneyu(\n",
+    "    df_st[df_st.group == 'A']['st'], \n",
+    "    df_st[df_st.group == 'B']['st']\n",
+    "#     nan_policy='propagate',\n",
+    "#     alternative='two-sided'\n",
+    ")\n",
+    "print(ttest,'\\n',ttest_st)\n",
+    "print(mwtest,'\\n',mwtest_st)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7f487e13",
+   "metadata": {},
+   "source": [
+    "## Linearization"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 63,
+   "id": "20c6b940",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def linearize_data(generated_df):\n",
+    "    ''' Функция, осуществляющая линеаризацию на сгенерированных данных '''\n",
+    "\n",
+    "    # Для проведения линеаризации добавим дополнительный столбец is_pilot - индикатор для обозначения пилотного периода\n",
+    "    # в новый датафрейм pre_linearized_df.\n",
+    "    pre_linearized_df = pd.concat([generated_df, pd.Series(np.zeros(len(generated_df))).map(int).rename('is_pilot')], axis=1)\n",
+    "\n",
+    "    pre_linearized_df.loc[pre_linearized_df.date >= '2019-04-01', 'is_pilot'] =  1\n",
+    "\n",
+    "    # Вычислим средние значения трафика до и во время пилотного периода для каждого магазина в mean_by_is_pilot\n",
+    "    mean_by_is_pilot = pre_linearized_df.groupby(['id', 'is_pilot']).mean().reset_index()\n",
+    "\n",
+    "    # Оставим в новом датафрейме mean_not_pilot средние значения трафика в магазинах до пилотного периода.\n",
+    "    mean_not_pilot = mean_by_is_pilot[mean_by_is_pilot['is_pilot'] == 0]\n",
+    "    mean_not_pilot = mean_not_pilot.assign(mean_traffic = np.array(mean_not_pilot['traffic'].map(int)))\n",
+    "    mean_not_pilot = mean_not_pilot.drop(['traffic', 'is_pilot'], axis = 1)  # Убираем лишние столбцы\n",
+    "\n",
+    "    # Соединяем сгенерированный датафрейм со столбцом is_pilot (pre_linearized_df) с полученным датафреймом значений\n",
+    "    # среднего трафика магазинов до пилотного периода.\n",
+    "    linearized_df = pd.merge(pre_linearized_df, mean_not_pilot, left_on = 'id', right_on = 'id', how = 'left', sort = False)\n",
+    "\n",
+    "    # Проводим линеаризацию, вычитая средние значения \"до\"-пилотного периода из сгенерированных значений трафика в\n",
+    "    # пилотном периоде для каждого магазина.\n",
+    "    linearized_df.loc[linearized_df.is_pilot == 1, 'traffic'] =  linearized_df['traffic'] - linearized_df['mean_traffic']\n",
+    "    \n",
+    "    # Убираем лишние столбцы из датафрейма линеаризованного трафика, а также значения \"до\"-пилотного периода\n",
+    "    linearized_df = linearized_df[linearized_df['is_pilot']== 1].drop(['is_pilot','mean_traffic'],axis = 1) \n",
+    "    \n",
+    "    return linearized_df "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 61,
+   "id": "66ac8ee2",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>id</th>\n",
+       "      <th>date</th>\n",
+       "      <th>traffic</th>\n",
+       "      <th>period</th>\n",
+       "      <th>group</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>77735080</td>\n",
+       "      <td>2019-01-01</td>\n",
+       "      <td>595</td>\n",
+       "      <td>before</td>\n",
+       "      <td>B</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>77735080</td>\n",
+       "      <td>2019-01-02</td>\n",
+       "      <td>665</td>\n",
+       "      <td>before</td>\n",
+       "      <td>B</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>77735080</td>\n",
+       "      <td>2019-01-03</td>\n",
+       "      <td>516</td>\n",
+       "      <td>before</td>\n",
+       "      <td>B</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>77735080</td>\n",
+       "      <td>2019-01-04</td>\n",
+       "      <td>615</td>\n",
+       "      <td>before</td>\n",
+       "      <td>B</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>77735080</td>\n",
+       "      <td>2019-01-05</td>\n",
+       "      <td>500</td>\n",
+       "      <td>before</td>\n",
+       "      <td>B</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>180995</th>\n",
+       "      <td>29515796</td>\n",
+       "      <td>2019-06-26</td>\n",
+       "      <td>681</td>\n",
+       "      <td>after</td>\n",
+       "      <td>A</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>180996</th>\n",
+       "      <td>29515796</td>\n",
+       "      <td>2019-06-27</td>\n",
+       "      <td>629</td>\n",
+       "      <td>after</td>\n",
+       "      <td>A</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>180997</th>\n",
+       "      <td>29515796</td>\n",
+       "      <td>2019-06-28</td>\n",
+       "      <td>538</td>\n",
+       "      <td>after</td>\n",
+       "      <td>A</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>180998</th>\n",
+       "      <td>29515796</td>\n",
+       "      <td>2019-06-29</td>\n",
+       "      <td>492</td>\n",
+       "      <td>after</td>\n",
+       "      <td>A</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>180999</th>\n",
+       "      <td>29515796</td>\n",
+       "      <td>2019-06-30</td>\n",
+       "      <td>652</td>\n",
+       "      <td>after</td>\n",
+       "      <td>A</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>181000 rows × 5 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "              id       date  traffic  period group\n",
+       "0       77735080 2019-01-01      595  before     B\n",
+       "1       77735080 2019-01-02      665  before     B\n",
+       "2       77735080 2019-01-03      516  before     B\n",
+       "3       77735080 2019-01-04      615  before     B\n",
+       "4       77735080 2019-01-05      500  before     B\n",
+       "...          ...        ...      ...     ...   ...\n",
+       "180995  29515796 2019-06-26      681   after     A\n",
+       "180996  29515796 2019-06-27      629   after     A\n",
+       "180997  29515796 2019-06-28      538   after     A\n",
+       "180998  29515796 2019-06-29      492   after     A\n",
+       "180999  29515796 2019-06-30      652   after     A\n",
+       "\n",
+       "[181000 rows x 5 columns]"
+      ]
+     },
+     "execution_count": 61,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "generated_df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 67,
+   "id": "9555dfb9",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>group</th>\n",
+       "      <th>traffic</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>A</td>\n",
+       "      <td>1580.192972</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>B</td>\n",
+       "      <td>1515.908532</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "  group      traffic\n",
+       "0     A  1580.192972\n",
+       "1     B  1515.908532"
+      ]
+     },
+     "execution_count": 67,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df_t.groupby('group').agg({'traffic': np.std}).reset_index()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 68,
+   "id": "ad2f19c7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "lin_dt = linearize_data(generated_df)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 69,
+   "id": "ab6baca5",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>group</th>\n",
+       "      <th>traffic</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>A</td>\n",
+       "      <td>68.483111</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>B</td>\n",
+       "      <td>68.481228</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "  group    traffic\n",
+       "0     A  68.483111\n",
+       "1     B  68.481228"
+      ]
+     },
+     "execution_count": 69,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "lin_dt.groupby('group').agg({'traffic': np.std}).reset_index()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7497c300",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
